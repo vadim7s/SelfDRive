@@ -4,8 +4,10 @@
 
 """
 This continues from Training_img_generator_with_autopilot.py
-but
-IDEA - use angle difference vs lane direction as a Y label
+but because of poor label quality,
+this is to take the car through good roads and
+take photos in each while spinnining the car in each point
+
 
 """
 
@@ -37,12 +39,7 @@ except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed')
 
 WHITE = (255,255,255)
-TIMER_LIMIT = 1000 #frames/ticks to limit recording loop to
-EPISODES = 5 # not used currently
-MIN_DISTANCE_FROM_JUNCTIONS = 20
-MIN_SPEED_TO_CHANGE_YAW = 2 #yaw adjustments will not apply below this speed
-SHOW_PYGAME = True #toggle to show display or not during image capture
-MAX_STEER_ANGLE_FOR_ADJ = 0.01 #the max steering angle for a random adj to be done (to ensure adjustments are only done when the car is straight)
+SHOW_PYGAME = False #toggle to show display or not during image capture
 PREFERRED_CAR = 'model3'
 YAW_ADJ_DEGREES = 45
 # highway road ids in Town05
@@ -154,28 +151,23 @@ class SensorManager:
         speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
         loc = self.vehicle.get_location() #returns something like Location(x=184.298294, y=-143.088516, z=0.000297)
         close_to_junction = False
-        for x in self.junction_list:
-            if loc.distance(x)<MIN_DISTANCE_FROM_JUNCTIONS:
-                close_to_junction = True
-        # now need to establish proximity to any junction
-        if self.tics_processing>5 and close_to_junction == False: #this if ignores images of car being dropped down at spawn and when it is stops for lights
-            # save camera image
-            image.save_to_disk( '_out_ang/%06d.png' % image.frame, carla.ColorConverter.Depth)
-            # save angle from straight
-            car_yaw = self.vehicle.get_transform().rotation.yaw
-            lane_yaw = self.world.get_map().get_waypoint(self.vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving).transform.rotation.yaw
-            
-            angle = car_yaw - lane_yaw
-            if angle < -185:
-                angle +=360
-            elif angle > 185:
-                angle -=360
-            
-            angle = round(angle,4)
-            
-            f = open('_out_ang/%06d.str' % image.frame,'w')
-            f.write(str(angle))
-            f.close()
+        # save camera image
+        image.save_to_disk( '_out_ang/%06d.png' % image.frame, carla.ColorConverter.Depth)
+        # save angle from straight
+        car_yaw = self.vehicle.get_transform().rotation.yaw
+        lane_yaw = self.world.get_map().get_waypoint(self.vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving).transform.rotation.yaw
+        
+        angle = car_yaw - lane_yaw
+        if angle < -185:
+            angle +=360
+        elif angle > 185:
+            angle -=360
+        
+        angle = round(angle,4)
+        
+        f = open('_out_ang/%06d.str' % image.frame,'w')
+        f.write(str(angle))
+        f.close()
             
         if SHOW_PYGAME: #self.display_man.render_enabled():
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
@@ -278,14 +270,9 @@ def run_simulation(args, client):
                     
         transform = random.choice(good_spawn_points)
         tick_counter=0
-        # introducing an initial random yaw rotation at the start for the atopilot to correct (possibly redundant as other sdjustments are done later)
-        transform.rotation.yaw = transform.rotation.yaw + random.randrange(-YAW_ADJ_DEGREES, YAW_ADJ_DEGREES, 1)
         vehicle = world.spawn_actor(bp, transform)
-
         vehicle_list.append(vehicle)
-        vehicle.set_autopilot(True)
-        traffic_manager.set_desired_speed(vehicle,float(10))
-
+        
         # Display Manager organize all the sensors an its display in a window
         # If can easily configure the grid and the total window size
         display_manager = DisplayManager(grid_size=[1, 1], window_size=[args.width, args.height])
@@ -297,37 +284,48 @@ def run_simulation(args, client):
                     vehicle, {}, display_pos=[0, 0], junctions=junction_list)
         
 
+        # set navigation points to loop through
+        all_waypoint_pairs = town_map.get_topology()
+        # subset of lane start/end's which belong to good roads
+        good_lanes = []
+        for w in all_waypoint_pairs:
+            if w[0].road_id in good_roads:
+                good_lanes.append(w)
+
         #Simulation loop
         call_exit = False
-        time_init_sim = timer.time()
-        while True:
-            # Carla Tick
-            if args.sync:
-                world.tick()
-            else:
-                world.wait_for_tick()
+        # loop all lanes
+        for lane in good_lanes:
+            #loop within a lane
+            for wp in lane[0].next_until_lane_end(20):
+                transform = wp.transform
+                vehicle.set_transform(transform)
+                # do multiple shots of straight direction
+                for i in range(5):
+                    trans = transform
+                    trans.rotation.yaw = transform.rotation.yaw + random.randrange(-YAW_ADJ_DEGREES, YAW_ADJ_DEGREES, 1)
+                    vehicle.set_transform(trans)
+                    # Carla Tick
+                    if args.sync:
+                        world.tick()
+                    else:
+                        world.wait_for_tick()
 
-            # Render received data
-            display_manager.render()
-            tick_counter +=1
-            # when the car is straight (steering is straight) and above certain speed introduce random yaw
-            vel = vehicle.get_velocity()
-            speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-            steer = vehicle.get_control().steer
-            if abs(steer) < MAX_STEER_ANGLE_FOR_ADJ and speed>MIN_SPEED_TO_CHANGE_YAW:
-                trans = vehicle.get_transform()
-                trans.rotation.yaw = trans.rotation.yaw + random.randrange(-YAW_ADJ_DEGREES, YAW_ADJ_DEGREES, 1)
-                vehicle.set_transform(trans)
-                
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    call_exit = True
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == K_ESCAPE or event.key == K_q:
-                        call_exit = True
+                    # Render received data
+                    display_manager.render()
+                    tick_counter +=1
+                    # move the car to location
+    
+                        
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            call_exit = True
+                        elif event.type == pygame.KEYDOWN:
+                            if event.key == K_ESCAPE or event.key == K_q:
+                                call_exit = True
+                                break
+                    if call_exit:
                         break
-            if call_exit or tick_counter>TIMER_LIMIT:
-                break
 
     finally:
         if display_manager:
