@@ -29,6 +29,7 @@ import argparse
 import random
 import time
 import numpy as np
+import cv2
 
 
 try:
@@ -39,7 +40,7 @@ except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed')
 
 WHITE = (255,255,255)
-SHOW_PYGAME = False #toggle to show display or not during image capture
+SHOW_PYGAME = True #toggle to show display or not during image capture
 PREFERRED_CAR = 'model3'
 YAW_ADJ_DEGREES = 45
 # highway road ids in Town05
@@ -81,12 +82,12 @@ class DisplayManager:
     def get_sensor_list(self):
         return self.sensor_list
 
-    def render(self):
+    def render(self,angle):
         if not self.render_enabled():
             return
 
         for s in self.sensor_list:
-            s.render()
+            s.render(angle)
 
         pygame.display.flip()
     
@@ -147,28 +148,7 @@ class SensorManager:
         array = np.reshape(array, (image.height, image.width, 4))
         array = array[:, :, :3]
         array = array[:, :, ::-1]
-        vel = self.vehicle.get_velocity()
-        speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-        loc = self.vehicle.get_location() #returns something like Location(x=184.298294, y=-143.088516, z=0.000297)
-        close_to_junction = False
-        # save camera image
-        image.save_to_disk( '_out_ang/%06d.png' % image.frame, carla.ColorConverter.Depth)
-        # save angle from straight
-        car_yaw = self.vehicle.get_transform().rotation.yaw
-        lane_yaw = self.world.get_map().get_waypoint(self.vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving).transform.rotation.yaw
-        
-        angle = car_yaw - lane_yaw
-        if angle < -185:
-            angle +=360
-        elif angle > 185:
-            angle -=360
-        
-        angle = round(angle,4)
-        
-        f = open('_out_ang/%06d.str' % image.frame,'w')
-        f.write(str(angle))
-        f.close()
-            
+                    
         if SHOW_PYGAME: #self.display_man.render_enabled():
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
         
@@ -182,34 +162,23 @@ class SensorManager:
         
 
     
-    def render(self):
+    def render(self,angle):
         if self.surface is not None:
-            offset = self.display_man.get_display_offset(self.display_pos)
-            self.display_man.display.blit(self.surface, offset)
-            throttle_value = 'Throttle: '+str(round(self.vehicle.get_control().throttle,4))
-            steering_value = 'Steering: '+str(round(self.vehicle.get_control().steer,4))
-            vel = self.vehicle.get_velocity()
-            velo = 'Speed: '+str(round(3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2),4))
-            car_yaw = self.vehicle.get_transform().rotation.yaw
-            lane_yaw = self.world.get_map().get_waypoint(self.vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving).transform.rotation.yaw
-            
-            angle = car_yaw - lane_yaw
-            if angle < -185:
-                angle +=360
-            elif angle > 185:
-                angle -=360
-            
-            angle = 'Angle: '+str(round(angle,2))
+            #  create a copy of the surface to save to disk
+            view = pygame.surfarray.array3d(self.surface)
+            #  convert from (width, height, channel) to (height, width, channel)
+            view = view.transpose([1, 0, 2])
+            #  convert from rgb to bgr
+            img_bgr = cv2.cvtColor(view, cv2.COLOR_RGB2BGR)
+            img_bgr.save_to_disk( '_out_ang/%06d.png' % img_bgr.frame, carla.ColorConverter.Depth)
+            # save angle from straight
+            f = open('_out_ang/%06d.str' % img_bgr.frame,'w')
+            f.write(str(angle))
+            f.close()
             
             font = pygame.font.SysFont(None, 24)
-            throttle = font.render(throttle_value, True, WHITE)
-            self.display_man.display.blit(throttle,(20, 20))
-            steering = font.render(steering_value, True, WHITE)
-            self.display_man.display.blit(steering,(20, 40))
-            velocity = font.render(velo, True, WHITE)
-            self.display_man.display.blit(velocity,(20, 60))
             angle_to_lane = font.render(angle, True, WHITE)
-            self.display_man.display.blit(angle_to_lane,(20, 80))
+            self.display_man.display.blit(angle_to_lane,(20, 20))
             
             
             
@@ -303,7 +272,8 @@ def run_simulation(args, client):
                 # do multiple shots of straight direction
                 for i in range(5):
                     trans = transform
-                    trans.rotation.yaw = transform.rotation.yaw + random.randrange(-YAW_ADJ_DEGREES, YAW_ADJ_DEGREES, 1)
+                    angle_adj = random.randrange(-YAW_ADJ_DEGREES, YAW_ADJ_DEGREES, 1)
+                    trans.rotation.yaw = transform.rotation.yaw +angle_adj 
                     vehicle.set_transform(trans)
                     # Carla Tick
                     if args.sync:
@@ -312,7 +282,7 @@ def run_simulation(args, client):
                         world.wait_for_tick()
 
                     # Render received data
-                    display_manager.render()
+                    display_manager.render(angle_adj)
                     tick_counter +=1
                     # move the car to location
     
