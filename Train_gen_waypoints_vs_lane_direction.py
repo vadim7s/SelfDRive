@@ -169,15 +169,13 @@ class SensorManager:
             #  convert from (width, height, channel) to (height, width, channel)
             view = view.transpose([1, 0, 2])
             #  convert from rgb to bgr
-            img_bgr = cv2.cvtColor(view, cv2.COLOR_RGB2BGR)
-            img_bgr.save_to_disk( '_out_ang/%06d.png' % img_bgr.frame, carla.ColorConverter.Depth)
+            img_gry = cv2.cvtColor(view, cv2.COLOR_RGB2GRAY) 
+            time_grab = time.time_ns()
+            cv2.imwrite('_out_ang/%06d_%s.png' % (time_grab, angle), img_gry)
             # save angle from straight
-            f = open('_out_ang/%06d.str' % img_bgr.frame,'w')
-            f.write(str(angle))
-            f.close()
             
             font = pygame.font.SysFont(None, 24)
-            angle_to_lane = font.render(angle, True, WHITE)
+            angle_to_lane = font.render(str(angle), True, WHITE)
             self.display_man.display.blit(angle_to_lane,(20, 20))
             
             
@@ -271,7 +269,7 @@ def run_simulation(args, client):
                 vehicle.set_transform(transform)
                 # do multiple shots of straight direction
                 for i in range(5):
-                    trans = transform
+                    trans = wp.transform
                     angle_adj = random.randrange(-YAW_ADJ_DEGREES, YAW_ADJ_DEGREES, 1)
                     trans.rotation.yaw = transform.rotation.yaw +angle_adj 
                     vehicle.set_transform(trans)
@@ -285,6 +283,7 @@ def run_simulation(args, client):
                     display_manager.render(angle_adj)
                     tick_counter +=1
                     # move the car to location
+                    vehicle.set_transform(transform)
     
                         
                     for event in pygame.event.get():
