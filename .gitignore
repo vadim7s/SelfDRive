@@ -2,3 +2,4 @@
 *.str
 cache/*
 .ipynb_checkpoints/*
+*.mp4
