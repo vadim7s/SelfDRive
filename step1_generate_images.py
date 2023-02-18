@@ -8,15 +8,19 @@ import cv2
 import numpy as np
 import random
 
-client = carla.Client('localhost', 2000)
-client.set_timeout(10)
-client.load_world('Town05') #This may give an error "RuntimeError: time-out of 5000ms while w..." - IGNORE
-
-#transform car through waypoints in a loop while printing the angle onto the image
-
 YAW_ADJ_DEGREES = 35
 PREFERRED_SPEED = 10
+#mount point of camerat on the carr
+CAMERA_POS_Z = 1.6
+CAMERA_POS_X = 0.9
 good_roads = [12, 34, 35, 36, 37, 38, 1201, 1236, 2034, 2035, 2343, 2344]
+
+
+client = carla.Client('localhost', 2000)
+client.set_timeout(10)
+client.load_world('Town05') 
+
+#transform car through waypoints in a loop while printing the angle onto the image
 
 world = client.get_world()
 
@@ -64,7 +68,7 @@ camera_bp = bp_lib.find('sensor.camera.rgb')
 camera_bp.set_attribute('image_size_x', '640') # this ratio works in CARLA 9.14 on Windows
 camera_bp.set_attribute('image_size_y', '360')
 
-camera_init_trans = carla.Transform(carla.Location(z=1.6,x=0.4))
+camera_init_trans = carla.Transform(carla.Location(z=CAMERA_POS_Z,x=CAMERA_POS_X))
 camera = world.spawn_actor(camera_bp,camera_init_trans,attach_to=vehicle)
 
 def camera_callback(image,data_dict):
