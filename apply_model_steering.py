@@ -14,7 +14,7 @@ this is test models with
 
 case 1: the car is the same as what training set for lane keeping was generated
         - user can only use throttle and brakes
-        - front camera is mounted exactly as in vadim_build.py so it creates the same images
+        - front camera is mounted exactly as in step1_generate*.py so it creates the same images
         - sudden yaw adjustments happen randomly when the car's steering is relatively straight 
         - steering is predicted from a saved model using latest image
         - the main view from the back should show how good the model is
@@ -149,6 +149,10 @@ except ImportError:
 from tensorflow.keras.models import load_model
 import cv2
 
+
+CAMERA_POS_Z = 1.6
+CAMERA_POS_X = 0.9
+
 # ==============================================================================
 # -- Global functions ----------------------------------------------------------
 # ==============================================================================
@@ -227,7 +231,7 @@ class World(object):
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
         # Get a car blueprint same as used before
-        blueprint = self.world.get_blueprint_library().filter('charger_2020')[0]
+        blueprint = self.world.get_blueprint_library().filter('model3')[0]
         blueprint.set_attribute('role_name', self.actor_role_name)
         if blueprint.has_attribute('terramechanics'):
             blueprint.set_attribute('terramechanics', 'true')
@@ -1080,7 +1084,7 @@ class CameraManager(object):
         Attachment = carla.AttachmentType
 
         self._camera_transforms = [
-            (carla.Transform(carla.Location(x=0, z=2.4), carla.Rotation(yaw=+00)), Attachment.Rigid),
+            (carla.Transform(carla.Location(z=CAMERA_POS_Z,x=CAMERA_POS_X), carla.Rotation(yaw=+00)), Attachment.Rigid),
             (carla.Transform(carla.Location(x=-2.0*bound_x, y=+0.0*bound_y, z=2.0*bound_z), carla.Rotation(pitch=8.0)), Attachment.SpringArmGhost),
             (carla.Transform(carla.Location(x=+0.8*bound_x, y=+0.0*bound_y, z=1.3*bound_z)), Attachment.Rigid),
             (carla.Transform(carla.Location(x=+1.9*bound_x, y=+1.0*bound_y, z=1.2*bound_z)), Attachment.SpringArmGhost),
@@ -1211,7 +1215,7 @@ class CameraManager(object):
 def game_loop(args):
 
     
-    model = load_model('lane_model_360x640_04_05',compile=False)
+    model = load_model('lane_model_360x640_02_20',compile=False)
     model.compile()
 
     pygame.init()
@@ -1221,8 +1225,8 @@ def game_loop(args):
 
     try:
         client = carla.Client(args.host, args.port)
-        client.set_timeout(2000.0)
-
+        client.set_timeout(10000.0)
+        client.load_world('Town05')
         sim_world = client.get_world()
         original_settings = sim_world.get_settings()
         settings = sim_world.get_settings()
