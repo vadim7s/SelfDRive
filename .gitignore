@@ -3,3 +3,4 @@
 cache/*
 .ipynb_checkpoints/*
 *.mp4
+lane_model_*
