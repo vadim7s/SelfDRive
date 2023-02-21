@@ -569,7 +569,7 @@ class KeyboardControl(object):
                     predicted_steer = self._steer_model.predict([image_final])
                     # now predicted steer is 0.5 when straight so we convert it to -1:+1
                     print(predicted_steer[0][0]) #prints predicted value in the console 
-                    self._control.steer = (predicted_steer[0][0]-0.5) * 2
+                    self._control.steer = predicted_steer[0][0]
                    
                     
 

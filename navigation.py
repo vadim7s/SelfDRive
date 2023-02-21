@@ -31,7 +31,6 @@ import carla
 #add a specific folder - must be changed for something more generic
 sys.path.append('C:/CARLA_0.9.14/PythonAPI/carla')
 from agents.navigation.global_route_planner import GlobalRoutePlanner
-#from agents.navigation.global_route_planner import GlobalRoutePlannerDAO
 
 client = carla.Client("localhost", 2000)
 client.set_timeout(10)
