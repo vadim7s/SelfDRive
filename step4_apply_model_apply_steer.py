@@ -12,7 +12,7 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 
 
-PREFERRED_SPEED = 10
+PREFERRED_SPEED = 60
 SPEED_THRESHOLD = 5
 
 # max angle when tarining images were produced
@@ -37,12 +37,13 @@ width_to = width_from + int(WIDTH_REQUIRED_PORTION * WIDTH)
 #adding params to display text to image
 font = cv2.FONT_HERSHEY_SIMPLEX
 # org
-org = (50, 50)
-fontScale = 1
+org = (30, 30)
+org2 = (30, 50)
+fontScale = 0.5
 # white color
 color = (255, 255, 255)
 # Line thickness of 2 px
-thickness = 2
+thickness = 1
 
 model = load_model('lane_model_360x640_02_20',compile=False)
 model.compile()
@@ -159,6 +160,7 @@ while True:
     v = vehicle.get_velocity()
     a = vehicle.get_acceleration()
     speed = round(3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2),0)
+    image = cv2.putText(image, 'Speed: '+str(int(speed)), org2, font, fontScale, color, thickness, cv2.LINE_AA)
     acceleration = round(math.sqrt(a.x**2 + a.y**2 + a.z**2),1)
     estimated_throttle = maintain_speed(speed)
     
